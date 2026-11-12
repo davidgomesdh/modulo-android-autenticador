@@ -1,0 +1,447 @@
+<title>Biometria por Hash na Base</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=Source+Sans+3:wght@400;600&display=swap">
+<style>
+  /* Layout: documento técnico de uma coluna; dois diagramas largos (componentes, sequência) seguidos das regras. */
+  :root {
+    --bg: #FFFFFF; --surface: #F6F8FA; --card: #FFFFFF;
+    --line: #DDE2EA; --line-strong: #97A1B2;
+    --ink: #161A24; --ink-2: #3F4756; --muted: #6B7382;
+    --accent: #0020DE; --accent-wash: #EDF0FF;
+    --ok-ink: #007842; --ok-wash: #E7F5EE;
+    --warn-ink: #A93A21; --warn-wash: #FBEDE9; --warn-line: #EBC7BC;
+    --font-display: Archivo, "Segoe UI", sans-serif;
+    --font-body: "Source Sans 3", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    --font-mono: "IBM Plex Mono", ui-monospace, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0D1018; --surface: #151A25; --card: #121722;
+      --line: #29313F; --line-strong: #616D81;
+      --ink: #E9ECF3; --ink-2: #B7BFCD; --muted: #8791A3;
+      --accent: #8B9BFF; --accent-wash: #191F38;
+      --ok-ink: #4CD394; --ok-wash: #10261C;
+      --warn-ink: #FF9375; --warn-wash: #291611; --warn-line: #4A2A20;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0D1018; --surface: #151A25; --card: #121722;
+    --line: #29313F; --line-strong: #616D81;
+    --ink: #E9ECF3; --ink-2: #B7BFCD; --muted: #8791A3;
+    --accent: #8B9BFF; --accent-wash: #191F38;
+    --ok-ink: #4CD394; --ok-wash: #10261C;
+    --warn-ink: #FF9375; --warn-wash: #291611; --warn-line: #4A2A20;
+    color-scheme: dark;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink-2);
+    font-family: var(--font-body); font-size: 17px; line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap {
+    max-width: 1180px; margin: 0 auto;
+    padding-block: 0 96px;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+  }
+  h1, h2, h3 { font-family: var(--font-display); color: var(--ink); text-wrap: balance; margin: 0; }
+  h1 { font-size: clamp(2rem, 5vw, 3rem); font-weight: 700; letter-spacing: -.025em; line-height: 1.06; }
+  h2 { font-size: clamp(1.35rem, 3vw, 1.8rem); font-weight: 600; letter-spacing: -.018em; line-height: 1.15; }
+  h3 { font-size: 1.05rem; font-weight: 600; }
+  p { margin: 0; }
+  code, .mono { font-family: var(--font-mono); font-size: .88em; }
+  code { background: var(--surface); border: 1px solid var(--line); border-radius: 4px; padding: 0 5px; color: var(--ink); }
+
+  .eyebrow { font-family: var(--font-mono); font-size: .72rem; font-weight: 500;
+             letter-spacing: .16em; text-transform: uppercase; color: var(--muted); }
+  header.masthead { border-bottom: 1px solid var(--line); padding-block: 56px 36px;
+                    display: flex; flex-direction: column; gap: 18px; }
+  .lede { font-size: 1.12rem; max-width: 70ch; }
+  .lede strong { color: var(--ink); }
+
+  section { padding-block: 48px 0; display: flex; flex-direction: column; gap: 18px; }
+  section > p { max-width: 72ch; }
+
+  .figure { border: 1px solid var(--line); border-radius: 12px; background: var(--card);
+            overflow-x: auto; padding-block: 12px; }
+  .figure svg { display: block; width: 100%; min-width: 900px; height: auto; }
+  .caption { font-size: .92rem; color: var(--muted); }
+
+  .legend { display: flex; flex-wrap: wrap; gap: 10px 28px; font-size: .95rem; }
+  .legend span { display: inline-flex; align-items: center; gap: 10px; }
+  .legend i { display: inline-block; width: 30px; height: 0; border-top: 2.5px solid; }
+  .legend .acc { border-color: var(--accent); }
+  .legend .warn { border-color: var(--warn-ink); }
+  .legend .neu { border-color: var(--ink-2); }
+
+  ol.steps { margin: 0; padding: 0; list-style: none; counter-reset: s;
+             display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px 28px; }
+  ol.steps li { counter-increment: s; display: grid; grid-template-columns: 26px 1fr; gap: 12px; align-items: start; min-width: 0; }
+  ol.steps li::before { content: counter(s); width: 24px; height: 24px; border-radius: 50%;
+                        background: var(--ink); color: var(--bg); font: 600 12px/24px var(--font-display);
+                        text-align: center; margin-top: 2px; }
+  ol.steps b { color: var(--ink); font-weight: 600; }
+
+  .split { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; }
+  .panel { border-radius: 12px; padding: 20px 22px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+  .panel.pass { background: var(--accent-wash); border: 1px solid var(--accent); }
+  .panel.block { background: var(--warn-wash); border: 1px solid var(--warn-line); }
+  .panel h3 { font-size: 1rem; }
+  .panel.pass h3 { color: var(--accent); }
+  .panel.block h3 { color: var(--warn-ink); }
+  .panel ul { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 4px; }
+
+  .rules { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 0 32px; }
+  .rule { border-top: 1px solid var(--line); padding-block: 16px; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .rule h3 { font-size: 1rem; }
+
+  .open { margin: 0; padding-left: 22px; display: flex; flex-direction: column; gap: 10px; max-width: 80ch; }
+  .open b { color: var(--ink); font-weight: 600; }
+  .note { border-left: 3px solid var(--line-strong); padding: 4px 0 4px 16px; max-width: 72ch; }
+
+  /* ---------- SVG ---------- */
+  .d-tablet { fill: var(--surface); stroke: var(--line-strong); stroke-width: 1.5; stroke-dasharray: 7 5; }
+  .d-box { fill: var(--card); stroke: var(--line-strong); stroke-width: 1.3; }
+  .d-store { fill: var(--surface); stroke: var(--line); stroke-width: 1; }
+  .d-ponte { fill: var(--accent-wash); stroke: var(--accent); stroke-width: 1.4; stroke-dasharray: 5 4; }
+  .d-note { fill: var(--surface); stroke: var(--line); stroke-width: 1; }
+  .d-life { stroke: var(--line-strong); stroke-width: 1.2; stroke-dasharray: 4 5; }
+  .d-band { fill: var(--accent-wash); }
+  .t-title { fill: var(--ink); font: 600 16px var(--font-display); }
+  .t-big { fill: var(--ink); font: 700 18px var(--font-display); }
+  .t-body { fill: var(--ink-2); font: 400 14px var(--font-body); }
+  .t-muted { fill: var(--muted); font: 400 13px var(--font-body); }
+  .t-eye { fill: var(--muted); font: 500 11px var(--font-mono); letter-spacing: .12em; }
+  .t-eye-acc { fill: var(--accent); font: 500 11px var(--font-mono); letter-spacing: .12em; }
+  .t-mono { fill: var(--ink-2); font: 400 12.5px var(--font-mono); }
+  .lab { font: 600 13px var(--font-body); paint-order: stroke; stroke: var(--card); stroke-width: 5px; stroke-linejoin: round; }
+  .lab-acc { fill: var(--accent); } .lab-warn { fill: var(--warn-ink); } .lab-neu { fill: var(--ink-2); }
+  .lab-mono { font: 500 12.5px var(--font-mono); paint-order: stroke; stroke: var(--card); stroke-width: 5px; stroke-linejoin: round; }
+  .l-acc { stroke: var(--accent); stroke-width: 2.2; fill: none; }
+  .l-warn { stroke: var(--warn-ink); stroke-width: 2.2; fill: none; }
+  .l-neu { stroke: var(--ink-2); stroke-width: 1.8; fill: none; }
+  .l-ret { stroke-dasharray: 6 5; }
+  .mk-acc { fill: var(--accent); } .mk-warn { fill: var(--warn-ink); } .mk-neu { fill: var(--ink-2); }
+  .n circle { fill: var(--ink); stroke: var(--card); stroke-width: 2.5; }
+  .n text { fill: var(--card); font: 600 12px var(--font-display); text-anchor: middle; }
+
+  @media print {
+    @page { size: A4 landscape; margin: 10mm; }
+    body { -webkit-print-color-adjust: exact; print-color-adjust: exact; font-size: 14px; }
+    .wrap { max-width: none; padding-block: 0; }
+    header.masthead { padding-block: 8px 20px; }
+    section { padding-block: 24px 0; }
+    .figure { overflow: visible; break-inside: avoid; }
+    .figure svg { min-width: 0; max-height: 165mm; }
+    .split, .rule, ol.steps li, .open li { break-inside: avoid; }
+  }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+</style>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <marker id="m-acc" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="mk-acc"/></marker>
+    <marker id="m-warn" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="mk-warn"/></marker>
+    <marker id="m-neu" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="mk-neu"/></marker>
+  </defs>
+</svg>
+
+<div class="wrap">
+
+<header class="masthead">
+  <span class="eyebrow">Desenho arquitetural · Base de Autenticação Multicanal</span>
+  <h1>Biometria por hash: só um identificador atravessa a ponte JS</h1>
+  <p class="lede">O Cockpit pede o desafio à API de Biometria informando o CPF e recebe de volta um <strong>hash</strong>.
+    Só esse hash passa pela ponte JS até a Base de Autenticação Multicanal. Com ele, a Base consulta a API,
+    descobre qual é o desafio e abre a biometria. <strong>Nenhum dado pessoal passa pela ponte</strong>: o CPF fica
+    entre o Cockpit e a API, e a imagem do rosto vai da tela de biometria direto ao parceiro.</p>
+</header>
+
+<!-- ====================== VISÃO DE COMPONENTES ====================== -->
+<section>
+  <span class="eyebrow">Visão de componentes</span>
+  <h2>Quem fala com quem</h2>
+
+  <div class="figure">
+  <svg viewBox="0 0 1120 580" role="img" aria-label="Diagrama de componentes: tablet com Cockpit, ponte JS, código nativo da Base e tela de biometria; à direita, API de Biometria e Unico; setas numeradas de 1 a 8.">
+    <!-- tablet -->
+    <rect class="d-tablet" x="20" y="22" width="580" height="478" rx="18"/>
+    <text class="t-eye" x="44" y="50">TABLET DO ATENDIMENTO · ANDROID</text>
+    <text class="t-big" x="44" y="76">Base de Autenticação Multicanal</text>
+
+    <!-- Cockpit -->
+    <rect class="d-box" x="50" y="96" width="520" height="114" rx="10"/>
+    <text class="t-title" x="70" y="126">Cockpit · Salesforce</text>
+    <text class="t-body" x="70" y="150">WebView principal da Base</text>
+    <text class="t-muted" x="70" y="172">o atendente conduz a contratação</text>
+
+    <!-- ponte -->
+    <rect class="d-ponte" x="50" y="240" width="520" height="54" rx="8"/>
+    <text class="t-eye-acc" x="68" y="262">PONTE JS · JSINTERFACE</text>
+    <text class="t-body" x="68" y="283">passam só o hash e o desfecho</text>
+
+    <!-- tela de biometria -->
+    <rect class="d-box" x="50" y="334" width="220" height="130" rx="10"/>
+    <text class="t-title" x="68" y="364">Tela de biometria</text>
+    <text class="t-body" x="68" y="388">WebView aberta por cima</text>
+    <text class="t-body" x="68" y="408">do Cockpit; fecha sozinha</text>
+    <text class="t-muted" x="68" y="440">câmera do tablet</text>
+
+    <!-- nativo -->
+    <rect class="d-box" x="330" y="334" width="240" height="130" rx="10"/>
+    <text class="t-title" x="348" y="364">Código nativo da Base</text>
+    <text class="t-body" x="348" y="388">recebe o hash, consulta</text>
+    <text class="t-body" x="348" y="408">o desafio e abre a tela</text>
+    <text class="t-muted" x="348" y="440">credencial do aplicativo</text>
+
+    <!-- API de Biometria -->
+    <rect class="d-box" x="760" y="96" width="340" height="240" rx="10"/>
+    <text class="t-title" x="780" y="126">API de Biometria</text>
+    <text class="t-muted" x="780" y="148">relaciona o CPF ao desafio e devolve o hash</text>
+    <rect class="d-store" x="780" y="172" width="300" height="104" rx="8"/>
+    <text class="t-eye" x="796" y="198">RELAÇÃO GUARDADA</text>
+    <text class="t-body" x="796" y="226">CPF do cliente ↔ desafio de biometria</text>
+    <text class="t-body" x="796" y="252">identificada pelo hash</text>
+
+    <!-- Unico -->
+    <rect class="d-box" x="760" y="410" width="340" height="90" rx="10"/>
+    <text class="t-title" x="780" y="440">Unico</text>
+    <text class="t-body" x="780" y="464">prova de vida e comparação facial;</text>
+    <text class="t-body" x="780" y="484">devolve o resultado à API</text>
+
+    <!-- 1: Cockpit -> API (CPF) -->
+    <line class="l-warn" x1="572" y1="122" x2="756" y2="122" marker-end="url(#m-warn)"/>
+    <text class="lab lab-warn" x="676" y="114" text-anchor="middle">CPF do cliente</text>
+    <g class="n"><circle cx="596" cy="122" r="11"/><text x="596" y="126">1</text></g>
+    <!-- 2: API -> Cockpit (hash) -->
+    <line class="l-acc" x1="758" y1="156" x2="574" y2="156" marker-end="url(#m-acc)"/>
+    <text class="lab lab-acc" x="676" y="148" text-anchor="middle">hash</text>
+    <g class="n"><circle cx="734" cy="156" r="11"/><text x="734" y="160">2</text></g>
+    <!-- 8: Cockpit -> API (resultado) -->
+    <line class="l-neu" x1="572" y1="190" x2="756" y2="190" marker-end="url(#m-neu)"/>
+    <text class="lab lab-neu" x="676" y="182" text-anchor="middle">resultado pelo hash</text>
+    <g class="n"><circle cx="596" cy="190" r="11"/><text x="596" y="194">8</text></g>
+
+    <!-- 3: Cockpit -> nativo (hash, ponte) -->
+    <line class="l-acc" x1="520" y1="212" x2="520" y2="330" marker-end="url(#m-acc)"/>
+    <text class="lab lab-acc" x="530" y="272">hash</text>
+    <g class="n"><circle cx="520" cy="225" r="11"/><text x="520" y="229">3</text></g>
+    <!-- 7: nativo -> Cockpit (desfecho, ponte) -->
+    <line class="l-acc" x1="410" y1="332" x2="410" y2="214" marker-end="url(#m-acc)"/>
+    <text class="lab lab-acc" x="420" y="272">desfecho</text>
+    <g class="n"><circle cx="410" cy="225" r="11"/><text x="410" y="229">7</text></g>
+
+    <!-- 4: nativo <-> API -->
+    <line class="l-acc" x1="574" y1="382" x2="756" y2="304" marker-start="url(#m-acc)" marker-end="url(#m-acc)"/>
+    <text class="lab lab-acc" x="690" y="378" text-anchor="middle">hash → desafio</text>
+    <g class="n"><circle cx="604" cy="369" r="11"/><text x="604" y="373">4</text></g>
+
+    <!-- 5: nativo -> tela -->
+    <line class="l-neu" x1="328" y1="400" x2="274" y2="400" marker-end="url(#m-neu)"/>
+    <g class="n"><circle cx="300" cy="378" r="11"/><text x="300" y="382">5</text></g>
+    <!-- 5: tela -> Unico (rosto) -->
+    <path class="l-warn" d="M160 466 V545 H930 V504" marker-end="url(#m-warn)"/>
+    <text class="lab lab-warn" x="560" y="537" text-anchor="middle">imagem do rosto · da tela direto para a Unico</text>
+    <g class="n"><circle cx="230" cy="545" r="11"/><text x="230" y="549">5</text></g>
+
+    <!-- 6: Unico -> API -->
+    <line class="l-neu" x1="1010" y1="408" x2="1010" y2="340" marker-end="url(#m-neu)"/>
+    <text class="lab lab-neu" x="1024" y="378">resultado</text>
+    <g class="n"><circle cx="1010" cy="384" r="11"/><text x="1010" y="388">6</text></g>
+  </svg>
+  </div>
+
+  <div class="legend">
+    <span><i class="acc"></i>só o hash ou o desfecho</span>
+    <span><i class="warn"></i>dado pessoal (CPF, rosto): nunca pela ponte</span>
+    <span><i class="neu"></i>resultado e controle</span>
+  </div>
+
+  <ol class="steps">
+    <li><span>O Cockpit chama a API de Biometria com o <b>CPF do cliente</b>. A API relaciona o CPF ao desafio e gera um hash.</span></li>
+    <li><span>A API responde ao Cockpit <b>só com o hash</b>.</span></li>
+    <li><span>O Cockpit entrega o hash à Base <b>pela ponte JS</b>.</span></li>
+    <li><span>A Base consulta a API com o hash e recebe o desafio: <b>biometria</b>.</span></li>
+    <li><span>A Base abre a <b>tela de biometria</b> por cima do Cockpit; o rosto do cliente vai direto para a Unico.</span></li>
+    <li><span>A Unico devolve o <b>resultado à API</b>, que o grava no desafio daquele hash.</span></li>
+    <li><span>A tela se fecha e a Base avisa o Cockpit pela ponte: <b>hash + desfecho</b>.</span></li>
+    <li><span>O Cockpit <b>confirma o resultado na API</b> pelo hash, e a contratação segue.</span></li>
+  </ol>
+</section>
+
+<!-- ====================== SEQUÊNCIA ====================== -->
+<section>
+  <span class="eyebrow">Sequência</span>
+  <h2>As chamadas, na ordem</h2>
+  <p>A faixa azul marca a ponte JS. Tudo o que cruza a faixa é o hash ou o desfecho.</p>
+
+  <div class="figure">
+  <svg viewBox="0 0 1120 760" role="img" aria-label="Diagrama de sequência entre Cockpit, Base, tela de biometria, API de Biometria e Unico.">
+    <!-- faixa da ponte -->
+    <rect class="d-band" x="196" y="78" width="40" height="660"/>
+    <text class="t-eye-acc" x="216" y="756" text-anchor="middle">PONTE JS</text>
+
+    <!-- cabeçalhos -->
+    <rect class="d-box" x="25" y="18" width="150" height="50" rx="8"/>
+    <text class="t-title" x="100" y="48" text-anchor="middle">Cockpit</text>
+    <rect class="d-box" x="255" y="18" width="150" height="50" rx="8"/>
+    <text class="t-title" x="330" y="48" text-anchor="middle">Base · nativo</text>
+    <rect class="d-box" x="465" y="18" width="150" height="50" rx="8"/>
+    <text class="t-title" x="540" y="48" text-anchor="middle">Tela de biometria</text>
+    <rect class="d-box" x="705" y="18" width="170" height="50" rx="8"/>
+    <text class="t-title" x="790" y="48" text-anchor="middle">API de Biometria</text>
+    <rect class="d-box" x="955" y="18" width="130" height="50" rx="8"/>
+    <text class="t-title" x="1020" y="48" text-anchor="middle">Unico</text>
+
+    <!-- linhas de vida -->
+    <line class="d-life" x1="100" y1="68" x2="100" y2="740"/>
+    <line class="d-life" x1="330" y1="68" x2="330" y2="740"/>
+    <line class="d-life" x1="540" y1="68" x2="540" y2="740"/>
+    <line class="d-life" x1="790" y1="68" x2="790" y2="740"/>
+    <line class="d-life" x1="1020" y1="68" x2="1020" y2="740"/>
+
+    <!-- 1 -->
+    <line class="l-warn" x1="102" y1="106" x2="786" y2="106" marker-end="url(#m-warn)"/>
+    <text class="lab-mono lab-warn" x="460" y="98" text-anchor="middle">POST /desafios · { cpf }</text>
+    <g class="n"><circle cx="124" cy="106" r="11"/><text x="124" y="110">1</text></g>
+    <!-- nota API -->
+    <rect class="d-note" x="802" y="120" width="200" height="52" rx="6"/>
+    <text class="t-muted" x="814" y="141">relaciona o CPF à biometria</text>
+    <text class="t-muted" x="814" y="160">e gera o hash</text>
+
+    <!-- 2 -->
+    <line class="l-acc l-ret" x1="788" y1="194" x2="104" y2="194" marker-end="url(#m-acc)"/>
+    <text class="lab-mono lab-acc" x="460" y="186" text-anchor="middle">201 · { hash }</text>
+    <g class="n"><circle cx="766" cy="194" r="11"/><text x="766" y="198">2</text></g>
+
+    <!-- 3 -->
+    <line class="l-acc" x1="102" y1="240" x2="326" y2="240" marker-end="url(#m-acc)"/>
+    <text class="lab-mono lab-acc" x="216" y="232" text-anchor="middle">Base.autenticar(hash)</text>
+    <g class="n"><circle cx="124" cy="240" r="11"/><text x="124" y="244">3</text></g>
+
+    <!-- 4 -->
+    <line class="l-acc" x1="332" y1="286" x2="786" y2="286" marker-end="url(#m-acc)"/>
+    <text class="lab-mono lab-acc" x="560" y="278" text-anchor="middle">GET /desafios/{hash} · credencial do app</text>
+    <g class="n"><circle cx="354" cy="286" r="11"/><text x="354" y="290">4</text></g>
+    <line class="l-neu l-ret" x1="788" y1="352" x2="334" y2="352" marker-end="url(#m-neu)"/>
+    <text class="lab-mono lab-neu" x="560" y="344" text-anchor="middle">{ desafio: biometria }</text>
+
+    <!-- 5 -->
+    <line class="l-neu" x1="332" y1="398" x2="536" y2="398" marker-end="url(#m-neu)"/>
+    <text class="lab lab-neu" x="436" y="390" text-anchor="middle">abre por cima</text>
+    <g class="n"><circle cx="354" cy="398" r="11"/><text x="354" y="402">5</text></g>
+    <line class="l-warn" x1="542" y1="440" x2="1016" y2="440" marker-end="url(#m-warn)"/>
+    <text class="lab lab-warn" x="780" y="432" text-anchor="middle">imagem do rosto · prova de vida</text>
+
+    <!-- 6 -->
+    <line class="l-neu" x1="1018" y1="486" x2="794" y2="486" marker-end="url(#m-neu)"/>
+    <text class="lab lab-neu" x="906" y="478" text-anchor="middle">resultado</text>
+    <g class="n"><circle cx="996" cy="486" r="11"/><text x="996" y="490">6</text></g>
+    <rect class="d-note" x="604" y="500" width="176" height="34" rx="6"/>
+    <text class="t-muted" x="616" y="522">grava no desafio do hash</text>
+
+    <!-- tela encerra -->
+    <line class="l-neu l-ret" x1="538" y1="560" x2="334" y2="560" marker-end="url(#m-neu)"/>
+    <text class="lab lab-neu" x="436" y="552" text-anchor="middle">jornada encerrada</text>
+    <rect class="d-note" x="346" y="574" width="130" height="30" rx="6"/>
+    <text class="t-muted" x="358" y="594">fecha a tela</text>
+
+    <!-- 7 -->
+    <line class="l-acc" x1="328" y1="628" x2="104" y2="628" marker-end="url(#m-acc)"/>
+    <text class="lab-mono lab-acc" x="196" y="620" text-anchor="middle">encerrada(hash, desfecho)</text>
+    <g class="n"><circle cx="314" cy="628" r="11"/><text x="314" y="632">7</text></g>
+
+    <!-- 8 -->
+    <line class="l-neu" x1="102" y1="670" x2="786" y2="670" marker-end="url(#m-neu)"/>
+    <text class="lab-mono lab-neu" x="460" y="662" text-anchor="middle">GET /desafios/{hash}/resultado</text>
+    <g class="n"><circle cx="124" cy="670" r="11"/><text x="124" y="674">8</text></g>
+    <line class="l-neu l-ret" x1="788" y1="712" x2="104" y2="712" marker-end="url(#m-neu)"/>
+    <text class="lab-mono lab-neu" x="460" y="704" text-anchor="middle">{ resultado }</text>
+  </svg>
+  </div>
+  <p class="caption">Rotas, métodos e campos são ilustrativos. Setas tracejadas são respostas.</p>
+</section>
+
+<!-- ====================== PONTE ====================== -->
+<section>
+  <span class="eyebrow">A ponte JS</span>
+  <h2>O que atravessa e o que fica de fora</h2>
+  <div class="split">
+    <div class="panel pass">
+      <h3>Passa pela ponte</h3>
+      <ul>
+        <li>o hash do desafio, do Cockpit para a Base</li>
+        <li>o desfecho (concluída, cancelada ou erro) com o mesmo hash, da Base para o Cockpit</li>
+      </ul>
+    </div>
+    <div class="panel block">
+      <h3>Nunca passa pela ponte</h3>
+      <ul>
+        <li>CPF, nome ou qualquer dado do cliente</li>
+        <li>imagem do rosto e resultado detalhado da biometria</li>
+        <li>URL da biometria, credenciais e tokens</li>
+      </ul>
+    </div>
+  </div>
+  <p class="note">Mudança em relação ao desenho anterior da ponte: a URL da biometria deixa de passar por ela.
+    A Base busca o desafio na API com o hash, e a ponte fica restrita a um identificador sem significado fora da API.</p>
+</section>
+
+<!-- ====================== REGRAS ====================== -->
+<section>
+  <span class="eyebrow">Requisitos do hash</span>
+  <h2>Para o hash não virar o dado sensível</h2>
+  <div class="rules">
+    <div class="rule">
+      <h3>Aleatório, nunca calculado do CPF</h3>
+      <p>O nome é "hash", mas o valor precisa ser gerado ao acaso (128 bits ou mais). Um hash do CPF se reverte
+        por tentativa: o CPF tem poucas combinações possíveis.</p>
+    </div>
+    <div class="rule">
+      <h3>Validade curta</h3>
+      <p>O desafio expira em minutos. Hash vencido é recusado pela API, e o Cockpit pede um novo.</p>
+    </div>
+    <div class="rule">
+      <h3>Uso único</h3>
+      <p>A primeira consulta da Base marca o hash como "em uso". Uma segunda consulta com o mesmo hash é recusada.</p>
+    </div>
+    <div class="rule">
+      <h3>Só a Base consulta o desafio</h3>
+      <p>A consulta do passo 4 exige a credencial do aplicativo. Um hash vazado não abre a biometria fora de um tablet do banco.</p>
+    </div>
+    <div class="rule">
+      <h3>A consulta não devolve o CPF</h3>
+      <p>A Base recebe só o tipo de desafio e o necessário para abrir a tela. O vínculo com o CPF fica dentro da API.</p>
+    </div>
+    <div class="rule">
+      <h3>Quem vale é a API, não a ponte</h3>
+      <p>O desfecho que chega pela ponte é um aviso. Qualquer script na página poderia imitá-lo. Antes de seguir
+        com a contratação, o Cockpit confirma o resultado na API (passo 8).</p>
+    </div>
+  </div>
+</section>
+
+<!-- ====================== EM ABERTO ====================== -->
+<section>
+  <span class="eyebrow">Em aberto</span>
+  <h2>O que precisa ser definido</h2>
+  <ol class="open">
+    <li><b>Quem é a API de Biometria neste desenho.</b> No desenho atual, a API de Biometria é do parceiro Unico.
+      Este fluxo exige uma API do banco que guarde a relação hash → CPF e o estado do desafio. Definir se é uma API nova
+      do time de desenvolvimento ou a evolução de uma existente.</li>
+    <li><b>De onde o Cockpit chama a API (passos 1 e 8).</b> Pelo servidor do Salesforce, o CPF não passa pelo tablet;
+      pelo navegador do Cockpit, passa pela WebView, ainda que fora da ponte.</li>
+    <li><b>Como a Base se identifica na API (passo 4).</b> Credencial do aplicativo, certificado do aparelho ou login do atendente.</li>
+    <li><b>Como o resultado chega da Unico à API (passo 6).</b> Aviso da Unico ou consulta da API, e o que acontece se o resultado atrasar.</li>
+    <li><b>Prazo de validade do hash</b> e o que o atendente vê quando ele expira no meio do atendimento.</li>
+  </ol>
+  <p class="note">Este desenho antecipa o padrão do Autenticador Demais Canais: o hash cumpre o papel do id de solicitação,
+    e a Base já passa a abrir o que a API indicar. Quando o Autenticador existir, a troca acontece do lado da API, sem mudar a ponte.</p>
+</section>
+
+</div>
